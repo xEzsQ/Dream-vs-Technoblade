@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dream vs Technoblade — 1v1 PvP vs IA</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    color: white; padding: 15px;
+  }
+  .wrap { max-width: 900px; width: 100%; text-align: center; }
+  h1 { font-size: 1.5em; margin-bottom: 4px; }
+  .subtitle { color: #aaa; font-size: 0.9em; margin-bottom: 15px; }
+  canvas {
+    background: #2d5a27; border-radius: 12px; border: 3px solid #111;
+    display: block; margin: 0 auto; max-width: 100%;
+    box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+  }
+  .hud { display: flex; gap: 15px; margin-bottom: 10px; align-items: center; }
+  .hp-side { flex: 1; text-align: left; }
+  .hp-side.right { text-align: right; }
+  .hp-label { font-weight: bold; margin-bottom: 4px; }
+  .hp-bar { height: 16px; border-radius: 8px; background: #333; overflow: hidden; }
+  .hp-fill { height: 100%; border-radius: 8px; transition: width .2s; }
+  .hp-fill.dream { background: #1db954; }
+  .hp-fill.techno { background: #e91e63; }
+  .center { color: #ffd700; font-weight: 900; font-size: 1.2em; }
+  .hidden { display: none; }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center; z-index: 10;
+  }
+  .panel {
+    background: rgba(255,255,255,0.08); border-radius: 20px; padding: 35px;
+    max-width: 600px; width: 92%; backdrop-filter: blur(10px); text-align: center;
+  }
+  .pick-grid { display: flex; gap: 18px; justify-content: center; margin: 25px 0; flex-wrap: wrap; }
+  .fighter {
+    flex: 1; max-width: 220px; min-width: 170px; padding: 22px; border-radius: 16px;
+    cursor: pointer; transition: all .2s; border: 3px solid transparent;
+  }
+  .fighter:hover { transform: translateY(-4px) scale(1.03); }
+  .fighter.dream { background: linear-gradient(135deg, #1db95433, #1db95411); }
+  .fighter.dream:hover { border-color: #1db954; }
+  .fighter.techno { background: linear-gradient(135deg, #e91e6333, #e91e6311); }
+  .fighter.techno:hover { border-color: #e91e63; }
+  .fighter .emoji { font-size: 2.6em; }
+  .fighter .name { font-size: 1.2em; font-weight: bold; margin-top: 8px; }
+  .fighter .special { color: #ccc; font-size: 0.85em; margin-top: 4px; }
+  .controls { color: #ccc; font-size: 0.95em; line-height: 1.7; margin-top: 15px; }
+  kbd {
+    background: #333; border: 1px solid #555; border-bottom-width: 3px;
+    border-radius: 5px; padding: 2px 8px; font-family: monospace; color: #ffd700;
+  }
+  .big { font-size: 3.2em; }
+  .btn {
+    background: linear-gradient(135deg, #ffd700, #ff9800); color: #222; border: none;
+    padding: 12px 38px; border-radius: 10px; font-size: 1.05em; font-weight: bold;
+    cursor: pointer; margin-top: 18px;
+  }
+  .difficulty { margin: 15px 0; }
+  .difficulty button {
+    background: #222; color: white; border: 2px solid #444; border-radius: 10px;
+    padding: 10px 22px; margin: 0 5px; cursor: pointer; font-size: 0.95em;
+  }
+  .difficulty button.sel { border-color: #ffd700; background: #333; color: #ffd700; }
+  #cdspecial, #cdattack { color: #ffd700; font-size: 0.9em; margin-top: 6px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚔️ Dream vs Technoblade — 1v1 PvP contre l'IA</h1>
+  <div class="subtitle">Combat réel en arène : déplace-toi, frappe, esquive, et utilise ton coup spécial !</div>
+​
+  <div class="hud">
+    <div class="hp-side">
+      <div class="hp-label" id="p1-label">🟩 Vous</div>
+      <div class="hp-bar"><div class="hp-fill dream" id="p1-hp" style="width:100%"></div></div>
+      <div id="p1-hp-text">100 HP</div>
+    </div>
+    <div class="center" id="timer">60s</div>
+    <div class="hp-side right">
+      <div class="hp-label" id="p2-label">🐷 IA</div>
+      <div class="hp-bar"><div class="hp-fill techno" id="p2-hp" style="width:100%"></div></div>
+      <div id="p2-hp-text">100 HP</div>
+    </div>
+  </div>
+​
+  <canvas id="game" width="860" height="520"></canvas>
+  <div id="cdspecial">Spécial [E] : prêt</div>
+  <div id="cdattack">Attaque [ESPACE] : prêt</div>
+</div>
+​
+<div class="overlay" id="menu">
+  <div class="panel">
+    <div class="big">⚔️</div>
+    <h2>Choisis ta légende</h2>
+    <div class="pick-grid">
+      <div class="fighter dream" onclick="startGame('dream')">
+        <div class="emoji">🟩</div>
+        <div class="name">Dream</div>
+        <div class="special">⚡ Spécial : Speed Rush — vitesse ×2.2 pendant 3s</div>
+      </div>
+      <div class="fighter techno" onclick="startGame('techno')">
+        <div class="emoji">🐷</div>
+        <div class="name">Technoblade</div>
+        <div class="special">🥔 Spécial : Potato Power — soigne 30 HP</div>
+      </div>
+    </div>
+    <div class="difficulty" id="diff">
+      <button data-d="easy" onclick="setDiff('easy')">Facile</button>
+      <button data-d="normal" class="sel" onclick="setDiff('normal')">Normal</button>
+      <button data-d="hard" onclick="setDiff('hard')">Difficile</button>
+    </div>
+    <div class="controls">
+      <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — se déplacer<br>
+      <kbd>ESPACE</kbd> — attaquer à l'épée ⚔️ &nbsp;&nbsp; <kbd>E</kbd> — coup spécial<br>
+      <kbd>SHIFT</kbd> — esquive rapide (dash) 🏃
+    </div>
+  </div>
+</div>
+​
+<div class="overlay hidden" id="endscreen">
+  <div class="panel">
+    <div class="big" id="end-emoji"></div>
+    <h2 id="end-title"></h2>
+    <div id="end-taunt" style="margin:12px 0; color:#ddd"></div>
+    <button class="btn" onclick="location.reload()">Revanche</button>
+  </div>
+</div>
+​
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+​
+const DIFF = {
+  easy:   { aiSpeed: 1.7, aiReaction: 0.35, aiDamage: 7,  aiAggro: 0.55 },
+  normal: { aiSpeed: 2.3, aiReaction: 0.18, aiDamage: 10, aiAggro: 0.75 },
+  hard:   { aiSpeed: 2.9, aiReaction: 0.08, aiDamage: 14, aiAggro: 0.92 },
+};
+let diff = DIFF.normal, diffName = 'normal';
+​
+const FIGHTERS = {
+  dream:   { emoji: '🟩', color: '#1db954', hp: 100, speed: 2.4, damage: 10, name: 'Dream' },
+  techno:  { emoji: '🐷', color: '#e91e63', hp: 100, speed: 2.3, damage: 11, name: 'Technoblade' },
+};
+​
+let player, ai, keys = {}, particles = [], floaters = [];
+let gameRunning = false, roundTimer = 60, lastTime = 0;
+​
+function setDiff(d) {
+  diffName = d; diff = DIFF[d];
+  document.querySelectorAll('#diff button').forEach(b => b.classList.toggle('sel', b.dataset.d === d));
+}
+​
+function makeFighter(type, x, isAI) {
+  const f = FIGHTERS[type];
+  return {
+    type, x, y: H / 2, r: 22, hp: f.hp, maxHp: f.hp, speed: f.speed, damage: f.damage,
+    facing: isAI ? -1 : 1, isAI,
+    attackCd: 0, specialCd: 0, dashCd: 0, dashTime: 0, speedBoost: 0,
+    attackAnim: 0, hitFlash: 0,
+  };
+}
+​
+function startGame(choice) {
+  const aiChoice = choice === 'dream' ? 'techno' : 'dream';
+  player = makeFighter(choice, W * 0.25, false);
+  ai = makeFighter(aiChoice, W * 0.75, true);
+  document.getElementById('p1-label').textContent = FIGHTERS[choice].emoji + ' Vous (' + FIGHTERS[choice].name + ')';
+  document.getElementById('p2-label').textContent = FIGHTERS[aiChoice].emoji + ' IA (' + FIGHTERS[aiChoice].name + ')';
+  document.querySelector('.hp-fill.dream').classList.remove('dream');
+  document.querySelector('.hp-fill.techno').classList.remove('techno');
+  document.getElementById('p1-hp').classList.add(choice);
+  document.getElementById('p2-hp').classList.add(aiChoice);
+  document.getElementById('menu').classList.add('hidden');
+  gameRunning = true;
+  roundTimer = 60;
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+​
+addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if ([' ', 'e', 'shift'].includes(e.key.toLowerCase())) e.preventDefault();
+  if (gameRunning && e.key.toLowerCase() === 'e') trySpecial(player);
+  if (gameRunning && e.key === ' ') tryAttack(player, ai);
+  if (gameRunning && e.key === 'Shift') tryDash(player);
+});
+addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+​
+function tryAttack(f, target) {
+  if (f.attackCd > 0) return;
+  f.attackCd = 0.55;
+  f.attackAnim = 0.2;
+  const dx = target.x - f.x, dy = target.y - f.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < f.r + target.r + 38) {
+    const dmg = Math.round(f.damage * (0.8 + Math.random() * 0.4));
+    target.hp = Math.max(0, target.hp - dmg);
+    target.hitFlash = 0.25;
+    spawnParticles(target.x, target.y, '#ff5555', 12);
+    addFloater(target.x, target.y - 30, '-' + dmg, '#ff6b6b');
+  } else {
+    spawnParticles(f.x + f.facing * 30, f.y, '#ffffff', 4);
+  }
+}
+​
+function trySpecial(f) {
+  if (f.specialCd > 0) return;
+  f.specialCd = 9;
+  if (f.type === 'dream') {
+    f.speedBoost = 3;
+    addFloater(f.x, f.y - 40, '⚡ SPEED RUSH !', '#1db954');
+    spawnParticles(f.x, f.y, '#1db954', 18);
+  } else {
+    f.hp = Math.min(f.maxHp, f.hp + 30);
+    addFloater(f.x, f.y - 40, '+30 🥔', '#ffd700');
+    spawnParticles(f.x, f.y, '#ffd700', 18);
+  }
+}
+​
+function tryDash(f) {
+  if (f.dashCd > 0) return;
+  f.dashCd = 1.6;
+  f.dashTime = 0.16;
+}
+​
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5, color });
+  }
+}
+​
+function addFloater(x, y, text, color) {
+  floaters.push({ x, y, text, color, life: 1 });
+}
+​
+function updateAI(dt) {
+  const dx = player.x - ai.x, dy = player.y - ai.y;
+  const dist = Math.hypot(dx, dy);
+  ai.facing = dx < 0 ? -1 : 1;
+​
+  if (Math.random() < diff.aiReaction * dt * 60) {
+    if (dist > 70 && Math.random() < diff.aiAggro) {
+      ai.moveX = Math.sign(dx); ai.moveY = Math.sign(dy);
+    } else {
+      ai.moveX = Math.random() < 0.5 ? Math.sign(-dx) : Math.sign(dx);
+      ai.moveY = (Math.random() - 0.5) * 2;
+    }
+  }
+​
+  if (ai.specialCd <= 0 && (ai.hp < 45 || Math.random() < 0.02)) trySpecial(ai);
+  if (dist < ai.r + player.r + 36 && ai.attackCd <= 0 && Math.random() < diff.aiAggro) tryAttack(ai, player);
+  if (ai.dashCd <= 0 && dist > 140 && Math.random() < 0.008) tryDash(ai);
+​
+  const sp = ai.speedBoost > 0 ? ai.speed * 1.8 : diff.aiSpeed;
+  moveFighter(ai, ai.moveX || 0, ai.moveY || 0, sp, dt);
+}
+​
+function moveFighter(f, mx, my, speed, dt) {
+  const len = Math.hypot(mx, my);
+  if (len > 0) {
+    let sp = f.speedBoost > 0 ? speed * 2.2 : speed;
+    if (f.dashTime > 0) sp *= 4;
+    f.x += (mx / len) * sp;
+    f.y += (my / len) * sp;
+    if (mx !== 0) f.facing = Math.sign(mx);
+  }
+  f.x = Math.max(f.r, Math.min(W - f.r, f.x));
+  f.y = Math.max(f.r, Math.min(H - f.r, f.y));
+}
+​
+function updatePlayer(dt) {
+  let mx = 0, my = 0;
+  if (keys['q'] || keys['a']) mx -= 1;
+  if (keys['d']) mx += 1;
+  if (keys['z'] || keys['w']) my -= 1;
+  if (keys['s']) my += 1;
+  moveFighter(player, mx, my, player.speed, dt);
+}
+​
+function updateCooldowns(f, dt) {
+  f.attackCd = Math.max(0, f.attackCd - dt);
+  f.specialCd = Math.max(0, f.specialCd - dt);
+  f.dashCd = Math.max(0, f.dashCd - dt);
+  f.dashTime = Math.max(0, f.dashTime - dt);
+  f.speedBoost = Math.max(0, f.speedBoost - dt);
+  f.attackAnim = Math.max(0, f.attackAnim - dt);
+  f.hitFlash = Math.max(0, f.hitFlash - dt);
+}
+​
+function drawFighter(f) {
+  ctx.save();
+  ctx.shadowColor = FIGHTERS[f.type].color;
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = f.hitFlash > 0 ? '#fff' : FIGHTERS[f.type].color;
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+​
+  ctx.font = '22px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(FIGHTERS[f.type].emoji, f.x, f.y + 8);
+​
+  if (f.attackAnim > 0) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(f.x, f.y);
+    ctx.lineTo(f.x + f.facing * (f.r + 36), f.y + (Math.random() - 0.5) * 10);
+    ctx.stroke();
+    ctx.font = '18px serif';
+    ctx.fillText('⚔️', f.x + f.facing * (f.r + 30), f.y - 5);
+  }
+  if (f.speedBoost > 0) {
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r + 8 + Math.sin(performance.now() / 60) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+​
+function drawArena() {
+  ctx.fillStyle = '#2d5a27';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 1;
+  for (let gx = 0; gx < W; gx += 43) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+  for (let gy = 0; gy < H; gy += 43) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+  ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 4;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+  ctx.font = '50px serif'; ctx.globalAlpha = 0.08;
+  ctx.fillText('⚔️', W / 2, H / 2 + 18);
+  ctx.globalAlpha = 1;
+}
+​
+function updateHUD() {
+  const p1 = document.getElementById('p1-hp'), p2 = document.getElementById('p2-hp');
+  p1.style.width = (player.hp / player.maxHp * 100) + '%';
+  p2.style.width = (ai.hp / ai.maxHp * 100) + '%';
+  document.getElementById('p1-hp-text').textContent = Math.ceil(player.hp) + ' HP';
+  document.getElementById('p2-hp-text').textContent = Math.ceil(ai.hp) + ' HP';
+  document.getElementById('cdspecial').textContent = 'Spécial [E] : ' + (player.specialCd > 0 ? player.specialCd.toFixed(1) + 's' : 'prêt !');
+  document.getElementById('cdattack').textContent = 'Attaque [ESPACE] : ' + (player.attackCd > 0 ? player.attackCd.toFixed(1) + 's' : 'prêt !');
+  document.getElementById('timer').textContent = Math.ceil(roundTimer) + 's';
+}
+​
+function endGame() {
+  gameRunning = false;
+  document.getElementById('endscreen').classList.remove('hidden');
+  const won = ai.hp <= 0 || (player.hp > 0 && player.hp > ai.hp);
+  const tie = player.hp === ai.hp;
+  document.getElementById('end-emoji').textContent = tie ? '🤝' : won ? '🏆' : '💀';
+  document.getElementById('end-title').textContent = tie ? 'Égalité !'
+    : won ? (player.type === 'dream' ? 'DREAM WINS ! 😎' : 'TECHNOBLADE NEVER DIES ! 👑')
+          : (ai.type === 'techno' ? "L'IA Technoblade vous écrase... 🐷" : "L'IA Dream a clutch le combat 🟩");
+  document.getElementById('end-taunt').textContent = tie ? 'Les deux légendes se respectent.'
+    : won ? 'GG ! ' + FIGHTERS[player.type].name + ' remporte le duel !'
+          : 'Retente ta chance, champion !';
+}
+​
+function loop(now) {
+  if (!gameRunning) return;
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+​
+  roundTimer -= dt;
+  updatePlayer(dt);
+  updateAI(dt);
+  updateCooldowns(player, dt);
+  updateCooldowns(ai, dt);
+​
+  particles = particles.filter(p => (p.life -= dt) > 0);
+  particles.forEach(p => { p.x += p.vx; p.y += p.vy; });
+  floaters = floaters.filter(f => (f.life -= dt) > 0);
+  floaters.forEach(f => f.y -= 30 * dt);
+​
+  drawArena();
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life * 2;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 4, 4);
+    ctx.globalAlpha = 1;
+  });
+  drawFighter(player);
+  drawFighter(ai);
+  floaters.forEach(f => {
+    ctx.globalAlpha = Math.min(1, f.life * 2);
+    ctx.fillStyle = f.color;
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.globalAlpha = 1;
+  });
+​
+  updateHUD();
+  if (player.hp <= 0 || ai.hp <= 0 || roundTimer <= 0) endGame();
+  else requestAnimationFrame(loop);
+</script>
+</body>
+</html>
